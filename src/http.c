@@ -6,11 +6,7 @@
 #include <string.h>
 #include "net.h"
 
-struct ev_io server_watcher;
 struct ev_loop *loop;
-
-static void write_cb(struct ev_loop *loop, struct ev_io *w, int revents);
-static void read_cb(struct ev_loop *loop, struct ev_io *w, int revents);
 
 typedef struct
 {
@@ -18,7 +14,11 @@ typedef struct
     char *response;
     Request *req;
 } client;
+
 char CONNECTION_CLOSE[18] = "Connection: close";
+
+static void write_cb(struct ev_loop *loop, struct ev_io *w, int revents);
+static void read_cb(struct ev_loop *loop, struct ev_io *w, int revents);
 
 int check_connection_close(char *buffer)
 {
@@ -107,11 +107,11 @@ static void read_cb(struct ev_loop *loop, struct ev_io *w, int revents)
     {
         ev_io_stop(loop, &c->w);
         close(c->w.fd);
-        free(c->req);
-        free(c);
+        cleanup(c);
         printf("peer might be closing\n");
         return;
     }
+
     ev_io_stop(loop, &c->w);
     ev_io_init(&c->w, worker_cb, c->w.fd, EV_WRITE);
     ev_io_start(loop, &c->w);
@@ -140,7 +140,7 @@ static void accept_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
     if (client_sd < 0)
     {
         perror("accept error");
-        free(c);
+        cleanup(c);
         return;
     }
 
@@ -151,9 +151,12 @@ static void accept_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
 int http_run(int port)
 {
     int fd = net_init_non_blocking_server(port);
+
     printf("server listening on http://localhost:%d\n", port);
+
     struct ev_loop *loop = ev_default_loop(0);
     struct ev_io io;
+
     ev_io_init(&io, accept_cb, fd, EV_READ);
     ev_io_start(loop, &io);
 
